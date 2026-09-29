@@ -1,125 +1,135 @@
-// PROMPT DATA REPOSITORY
-const promptsData = [
-  {
-    id: 1,
-    title: "Cinematic Anime Boy vs Monster Battle",
-    tag: "Sora / Midjourney",
-    mediaType: "image",
-    mediaUrl: "", 
-    prompt: "An epic cinematic anime shot of a young boy facing an enormous towering shadow monster in a rain-soaked futuristic city. Dynamic low-angle camera angle, glowing blue energy aura surrounding the boy, neon reflections on wet asphalt, volumetric lighting, hyper-detailed action anime style, 8k resolution, photorealistic masterpiece."
-  },
-  {
-    id: 2,
-    title: "Master ChatGPT Coding Assistant",
-    tag: "ChatGPT / Claude",
-    mediaType: "none",
-    mediaUrl: "",
-    prompt: "You are an elite Senior Full-Stack Engineer and Architect. When I present a code snippet or request, analyze it step-by-step for performance optimizations, memory leaks, and edge cases. Always respond with clean, production-ready, modular code accompanied by precise explanations."
-  },
-  {
-    id: 3,
-    title: "Cyberpunk Street Samurai Character Design",
-    tag: "Midjourney v6",
-    mediaType: "image",
-    mediaUrl: "",
-    prompt: "Full-body portrait of a female cyberpunk samurai standing under glowing hologram signages in a misty Tokyo street. Cybernetic armor with gold accents, katana with glowing plasma edge, vibrant contrast, Unreal Engine 5 render, extremely detailed face features --ar 9:16 --v 6.0"
+window.promptsData = [];
+let currentFullPrompt = "";
+
+function handleMediaFallback(el, baseRef, step = 1, isFullView = false) {
+  const container = isFullView ? document.getElementById('fullMediaBox') : el.parentElement;
+  if (step === 1) {
+    container.innerHTML = `<img src="${baseRef}.jpg" class="${isFullView ? 'full-detail-media' : 'media-preview'}" loading="lazy" onerror="handleMediaFallback(this, '${baseRef}', 2, ${isFullView})">`;
+  } else if (step === 2) {
+    container.innerHTML = `<img src="${baseRef}.png" class="${isFullView ? 'full-detail-media' : 'media-preview'}" loading="lazy" onerror="handleMediaFallback(this, '${baseRef}', 3, ${isFullView})">`;
+  } else {
+    container.style.display = 'none';
+    container.innerHTML = '';
   }
-];
-
-let activePromptObj = null;
-
-// RENDER GRID CARDS
-function renderGrid() {
-  const gridContainer = document.getElementById('explore-grid');
-  const searchInput = document.getElementById('searchInput').value.toLowerCase().trim();
-  
-  gridContainer.innerHTML = '';
-
-  const filteredData = promptsData.filter(item => {
-    return item.title.toLowerCase().includes(searchInput) || 
-           item.prompt.toLowerCase().includes(searchInput) ||
-           item.tag.toLowerCase().includes(searchInput);
-  });
-
-  if (filteredData.length === 0) {
-    gridContainer.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 24px 0;">No prompts found matching your search.</p>`;
-    return;
-  }
-
-  filteredData.forEach(item => {
-    const card = document.createElement('div');
-    card.className = 'card';
-    card.onclick = () => openFullPage(item.id);
-
-    let mediaHtml = '';
-    if (item.mediaType === 'image' && item.mediaUrl) {
-      mediaHtml = `<img src="${item.mediaUrl}" alt="${item.title}" class="card-media">`;
-    }
-
-    card.innerHTML = `
-      ${mediaHtml}
-      <div class="card-content">
-        <h3 class="card-title">${item.title}</h3>
-        <p class="card-snippet">${item.prompt}</p>
-        <div class="card-action-bar">
-          <span class="tag">${item.tag}</span>
-          <button class="open-btn">View Prompt</button>
-        </div>
-      </div>
-    `;
-
-    gridContainer.appendChild(card);
-  });
 }
 
-// OPEN DETAIL VIEW
-function openFullPage(id) {
-  const item = promptsData.find(p => p.id === id);
+async function loadScripts() {
+  const loadScript = (i) => new Promise((resolve) => {
+    const s = document.createElement('script');
+    s.src = `p${i}.js`;
+    s.onload = s.onerror = () => resolve();
+    document.body.appendChild(s);
+  });
+
+  for (let i = 1; i <= 50; i++) {
+    await loadScript(i);
+    renderGrid();
+  }
+}
+
+function createTakiesCard(item, index) {
+  const baseRef = item.refId || `p${index + 1}ref`;
+  return `
+    <div class="takies-card" onclick="openFullPage(${index})">
+      <div class="media-box">
+        <video src="${baseRef}.mp4" class="media-preview" muted loop playsinline preload="metadata" onloadeddata="this.currentTime = 0.1;" onerror="handleMediaFallback(this, '${baseRef}', 1, false)"></video>
+      </div>
+      <div class="card-head">
+        <span class="card-title">${item.title || 'Untitled Prompt'}</span>
+        <span class="tag">${item.description || item.category || 'AI'}</span>
+      </div>
+    </div>
+  `;
+}
+
+function renderGrid() {
+  const grid = document.getElementById('explore-grid');
+  const rawQuery = document.getElementById('searchInput').value.toLowerCase().trim();
+  const searchWords = rawQuery.split(' ').filter(word => word.length > 0);
+  
+  grid.innerHTML = '';
+  const fragment = document.createDocumentFragment();
+  let count = 0;
+
+  window.promptsData.forEach((item, index) => {
+    const titleText = (item.title || '').toLowerCase();
+    const promptText = (item.prompt || '').toLowerCase();
+    const descText = (item.description || item.category || '').toLowerCase();
+    const combinedText = `${titleText} ${promptText} ${descText}`;
+
+    const matchesAllWords = searchWords.every(word => combinedText.includes(word));
+
+    if (searchWords.length === 0 || matchesAllWords) {
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = createTakiesCard(item, index);
+      fragment.appendChild(tempDiv.firstElementChild);
+      count++;
+    }
+  });
+
+  if (count === 0 && searchWords.length > 0) {
+    grid.innerHTML = `<div class="no-results">No prompts matching "${rawQuery}" in GPT-Prompt Arena</div>`;
+  } else {
+    grid.appendChild(fragment);
+  }
+}
+
+function openFullPage(index) {
+  const item = window.promptsData[index];
   if (!item) return;
 
-  activePromptObj = item;
-
-  document.getElementById('fullTitle').innerText = item.title;
-  document.getElementById('fullTag').innerText = item.tag;
-  document.getElementById('fullPromptText').innerText = item.prompt;
-
+  currentFullPrompt = item.prompt || "";
+  document.getElementById('page-explore').classList.remove('active-page');
   const mediaBox = document.getElementById('fullMediaBox');
-  if (item.mediaType === 'image' && item.mediaUrl) {
-    mediaBox.style.display = 'block';
-    mediaBox.innerHTML = `<img src="${item.mediaUrl}" alt="${item.title}">`;
-  } else {
-    mediaBox.style.display = 'none';
-    mediaBox.innerHTML = '';
-  }
+  const baseRef = item.refId || `p${index + 1}ref`;
 
-  document.getElementById('full-detail-page').classList.add('active');
+  mediaBox.style.display = 'flex';
+  mediaBox.innerHTML = `<video src="${baseRef}.mp4" class="full-detail-media" controls autoplay loop playsinline onerror="handleMediaFallback(this, '${baseRef}', 1, true)"></video>`;
+
+  document.getElementById('fullTitle').innerText = item.title || 'Untitled Prompt';
+  document.getElementById('fullTag').innerText = item.description || item.category || 'AI PROMPT';
+  document.getElementById('fullPromptText').innerText = currentFullPrompt;
+
+  document.title = `${item.title || 'Prompt Detail'} | GPT-Prompt Arena`;
+
+  document.getElementById('full-detail-page').style.display = 'flex';
+  window.scrollTo(0, 0);
 }
 
-// CLOSE DETAIL VIEW
 function closeFullPage() {
-  document.getElementById('full-detail-page').classList.remove('active');
-  activePromptObj = null;
+  const mediaBox = document.getElementById('fullMediaBox');
+  mediaBox.innerHTML = '';
+  mediaBox.style.display = 'none';
+  document.getElementById('full-detail-page').style.display = 'none';
+  document.getElementById('page-explore').classList.add('active-page');
+  document.title = "GPT-Prompt Arena - Free AI Prompts, Midjourney, ChatGPT & Sora Library";
 }
 
-// COPY PROMPT TO CLIPBOARD
 function copyFullPrompt() {
-  if (!activePromptObj) return;
-
-  navigator.clipboard.writeText(activePromptObj.prompt).then(() => {
-    const btnHeader = document.getElementById('fullCopyBtnHeader');
+  navigator.clipboard.writeText(currentFullPrompt).then(() => {
     const btnMain = document.getElementById('fullCopyBtnMain');
-
-    btnHeader.innerText = 'Copied!';
-    btnMain.innerText = 'Copied to Clipboard!';
+    const btnHeader = document.getElementById('fullCopyBtnHeader');
+    
+    if (btnMain) {
+      btnMain.innerHTML = `✓ Copied to Clipboard!`;
+      btnMain.classList.add('copied');
+    }
+    if (btnHeader) {
+      btnHeader.innerHTML = `✓ Copied!`;
+      btnHeader.classList.add('copied');
+    }
 
     setTimeout(() => {
-      btnHeader.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy`;
-      btnMain.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy Full Prompt`;
+      if (btnMain) {
+        btnMain.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy Full Prompt`;
+        btnMain.classList.remove('copied');
+      }
+      if (btnHeader) {
+        btnHeader.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy`;
+        btnHeader.classList.remove('copied');
+      }
     }, 2000);
   });
 }
 
-// INITIAL RENDER
-document.addEventListener('DOMContentLoaded', () => {
-  renderGrid();
-});
+loadScripts();
